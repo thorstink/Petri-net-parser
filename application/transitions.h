@@ -1,5 +1,5 @@
 #pragma once
-#include "Systemetri/model.h"
+#include "Symmetri/model.h"
 
 model::OptionalReducer action0();
 model::OptionalReducer action1();

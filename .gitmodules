@@ -1,3 +1,10 @@
 [submodule "submodules/tinyxml2"]
 	path = submodules/tinyxml2
 	url = https://github.com/leethomason/tinyxml2.git
+
+[submodule "submodules/MPMCQueue"]
+	path = submodules/MPMCQueue
+	url = https://github.com/rigtorp/MPMCQueue
+[submodule "submodules/concurrentqueue"]
+	path = submodules/concurrentqueue
+	url = https://github.com/cameron314/concurrentqueue.git

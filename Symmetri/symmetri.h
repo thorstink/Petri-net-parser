@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-namespace systemetri {
+namespace symmetri {
 std::function<void()> start(const std::string &,
                             const model::TransitionActionMap &);
-} // namespace systemetri
+} // namespace symmetri
