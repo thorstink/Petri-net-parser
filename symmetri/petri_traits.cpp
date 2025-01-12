@@ -1,5 +1,4 @@
 #include <future>
-#include <iostream>
 
 #include "petri.h"
 #include "symmetri/symmetri.h"

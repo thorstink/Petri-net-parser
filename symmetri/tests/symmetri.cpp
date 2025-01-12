@@ -195,7 +195,14 @@ TEST_CASE("Types") {
   CHECK(not bool(Canceled == ExternalState));
   CHECK(not bool(Failed == ExternalState));
   CHECK(bool(ExternalState == ExternalState));
-  CHECK(bool(ExternalState.toString() != ""));
+  CHECK(bool(ExternalState.toString() != NULL));
+}
+
+TEST_CASE("Test color names") {
+  CHECK_EQ(std::string(ExternalState.toString()), "ExternalState");
+  CHECK_EQ(std::string(Canceled.toString()), "Canceled");
+  CHECK_EQ(std::string(Started.toString()), "Started");
+  CHECK_EQ(std::string(Failed.toString()), "Failed");
 }
 
 TEST_CASE("Print some Types") {

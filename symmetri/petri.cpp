@@ -12,7 +12,7 @@ convert(const Net &_net) {
   store.reserve(transition_count);
   for (const auto &[t, io] : _net) {
     transitions.push_back(t);
-    store.push_back(DirectMutation{});
+    store.emplace_back(identity<DirectMutation>{});
     for (const auto &p : io.first) {
       places.push_back(p.first);
     }
@@ -24,7 +24,7 @@ convert(const Net &_net) {
     auto last = std::unique(places.begin(), places.end());
     places.erase(last, places.end());
   }
-  return {transitions, places, store};
+  return {std::move(transitions), std::move(places), std::move(store)};
 }
 
 std::tuple<std::vector<SmallVectorInput>, std::vector<SmallVectorInput>>
@@ -126,7 +126,7 @@ void Petri::fireAsynchronous(const size_t t) {
   scheduled_callbacks.push_back(t);
   log.push_back({t, Scheduled, Clock::now()});
 
-  pool->push([=] {
+  pool->push([t, &task, this] {
     reducer_queue->enqueue(scheduleCallback(t, task, reducer_queue));
   });
 }

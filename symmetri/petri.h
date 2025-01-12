@@ -192,7 +192,7 @@ struct Petri {
    */
   void fireTransitions();
 
-  struct {
+  struct PTNet {
     /**
      * @brief (ordered) list of string representation of transitions
      *
@@ -240,11 +240,10 @@ struct Petri {
      */
     std::vector<Callback> store;
 
-    void registerCallback(const std::string &t,
-                          const Callback &callback) noexcept {
+    void registerCallback(const std::string &t, Callback &&callback) noexcept {
       if (std::find(transition.begin(), transition.end(), t) !=
           transition.end()) {
-        store[toIndex(transition, t)] = callback;
+        store[toIndex(transition, t)] = std::move(callback);
       }
     }
   } net;  ///< Is a data-oriented design of a Petri net
@@ -283,4 +282,15 @@ struct Petri {
   void fireAsynchronous(const size_t t);
 };
 
+std::tuple<std::vector<std::string>, std::vector<std::string>,
+           std::vector<Callback>>
+convert(const Net &_net);
+std::tuple<std::vector<SmallVectorInput>, std::vector<SmallVectorInput>>
+populateIoLookups(const Net &_net, const std::vector<Place> &ordered_places);
+std::vector<SmallVector> createReversePlaceToTransitionLookup(
+    size_t place_count, size_t transition_count,
+    const std::vector<SmallVectorInput> &input_transitions);
+
+std::vector<int8_t> createPriorityLookup(
+    const std::vector<Transition> transition, const PriorityTable &_priority);
 }  // namespace symmetri

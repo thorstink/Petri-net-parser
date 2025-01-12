@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
           {"Pb", Success}, {"Pb", Success}, {"Pc", Success}, {"Pc", Success}};
 
       PetriNet petri(net, "benchmark", pool, initial_marking, goal_marking);
-      petri.registerCallback("t0", Simple{});
+      petri.registerCallbackInPlace<Simple>("t0");
       petri.registerCallback("t1", Simple{});
       return petri;
     }

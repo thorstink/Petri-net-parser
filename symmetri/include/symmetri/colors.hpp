@@ -2,6 +2,8 @@
 
 /** @file colors.hpp */
 
+#include <string.h>
+
 #include <algorithm>
 #include <array>  // std::array
 #include <cassert>
@@ -9,17 +11,16 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>  // std::index_sequence
-#include <vector>
-namespace symmetri {
+#include <vector>   // hash
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-
+namespace sym_impl {
 // https://rodusek.com/posts/2021/03/09/getting-an-unmangled-type-name-at-compile-time/
 
 template <std::size_t... Idxs>
 constexpr auto substring_as_array(std::string_view str,
                                   std::index_sequence<Idxs...>) {
-  return std::array{str[Idxs]...};
+  return std::array{str[Idxs]..., '\0'};
 }
 
 template <typename T>
@@ -92,6 +93,8 @@ constexpr auto unique_id() {
 }
 
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
+}
+namespace symmetri {
 
 /**
  * @brief Tokens are elements that can reside in places. Tokens can have a color
@@ -102,108 +105,95 @@ constexpr auto unique_id() {
  *
  */
 class Token {
-  const static size_t kMaxTokenColors =
-      100;     ///< Maximum amount of different colors
-  size_t idx;  ///< A numerical id ("color") for this particular token
-  inline static std::array<std::string_view, kMaxTokenColors>
-      v{};  ///< The human read-able string representation of the "color" is
-            ///< stored in this buffer using the numerical id as index.
-
- protected:
-  /**
-   * @brief Creates a Token with a unique numerical id and a string
-   * representation based on the name of the argument-type at compile-time.
-   *
-   * @tparam T the type representing the token-color
-   */
-  template <class T>
-  constexpr Token(T* const) : idx(unique_id<T>()) {
-    static_assert(unique_id<T>() < v.size(),
-                  "There can only be 100 different token-colors.");
-    v[idx] = type_name<T>();
-  }
-
  public:
-  /**
-   * @brief Construct a new Token object from a string at run-time. A unique id
-   * is generated and if it fails it will exit the application through a failing
-   * assert.
-   *
-   * @param s string-representation of the color
-   */
-  Token(const char* s)
-      : idx([&]() -> size_t {
-          static size_t i = 0;
-          auto it = std::find(v.cbegin(), v.cend(), s);
-          if (it == std::cend(v)) {
-            i++;
-            return v.size() - i;
-          } else {
-            return std::distance(v.cbegin(), it);
-          }
-        }()) {
-    if (std::find(v.cbegin(), v.cend(), s) == std::cend(v)) {
-      assert(v[idx].empty() && "There can only be 100 different token-colors.");
-      v[idx] = s;
-    }
-  }
-
-  Token() = delete;
-
   /**
    * @brief Get a list of all the colors
    *
-   * @return std::vector<std::string_view>
+   * @return std::vector<const char *>
    */
-  static std::vector<std::string_view> getColors() {
-    std::vector<std::string_view> colors;
-    colors.reserve(v.size());
-    std::copy_if(v.begin(), v.end(), std::back_inserter(colors),
-                 [](const auto& color) { return not color.empty(); });
-    return colors;
+  static std::vector<const char*> getColors() {
+    std::vector<const char*> _colors;
+    _colors.reserve(colors.size());
+    std::copy_if(colors.begin(), colors.end(), std::back_inserter(_colors),
+                 [](const auto& color) { return color != nullptr; });
+    return _colors;
   }
+
+  constexpr const auto& toString() const { return colors[id]; }
+
+  template <class T>
+  constexpr bool operator==(const T& t) const {
+    return id == t.id;
+  }
+
   constexpr bool operator<(const Token& rhs) const {
-    return idx < rhs.toIndex();
+    return id < rhs.toIndex();
   }
+
   constexpr bool operator>(const Token& rhs) const {
-    return idx > rhs.toIndex();
+    return id > rhs.toIndex();
   }
   /**
    * @brief returns the unique index for this color.
    *
    * @return constexpr size_t
    */
-  constexpr size_t toIndex() const { return idx; }
+  constexpr int toIndex() const { return id; }
 
-  /**
-   * @brief returns the string-representation for this color.
-   *
-   * @return constexpr const auto&
-   */
-  constexpr const auto& toString() const { return v[idx]; }
-  constexpr bool operator==(const Token& c) const { return idx == c.idx; }
-  template <class T>
-  constexpr bool operator==(const T&) const {
-    return idx == unique_id<T>();
-  }
+  Token(const char* _id)
+      : id([_id]() -> int {
+          const auto it =
+              std::find_if(colors.cbegin(), colors.cend(), [=](const char* s) {
+                return s != nullptr && 0 == strcmp(_id, s);
+              });
+          if (it == colors.cend()) {
+            const auto nullptr_it =
+                std::find(colors.cbegin(), colors.cend(), nullptr);
+            assert(nullptr_it != colors.cend() &&
+                   "There can only be kMaxTokenColors different token-colors.");
+            const auto idx = std::distance(colors.cbegin(), nullptr_it);
+            colors[idx] = strdup(_id);
+            return idx;
+          } else {
+            return std::distance(colors.cbegin(), it);
+          }
+        }()) {}
+
+ protected:
+  const static size_t kMaxTokenColors =
+      100;  ///< Maximum amount of different colors
+  constexpr Token(const char* id, const int idx) : id(idx) { colors[idx] = id; }
+  inline static std::array<const char*, kMaxTokenColors> colors = {nullptr};
+  int id;
 };
 
 }  // namespace symmetri
+
+// Custom specialization of std::hash can be injected in namespace std.
+template <>
+struct std::hash<symmetri::Token> {
+  constexpr std::size_t operator()(const symmetri::Token& s) const noexcept {
+    return s.toIndex();
+  }
+};
 
 /**
  * @brief A macro from which we can create token-colors. Colors ceated this way
  * end up in the symmetri namespace.
  *
  */
-#define CREATE_CUSTOM_TOKEN(name)                     \
-  namespace symmetri {                                \
-  struct name : public Token {                        \
-    constexpr name() : Token(this) {}                 \
-    constexpr bool operator==(const Token& c) const { \
-      return toIndex() == c.toIndex();                \
-    }                                                 \
-  };                                                  \
-  static inline name name;                            \
+#define CREATE_CUSTOM_TOKEN(name)                                       \
+  namespace symmetri {                                                  \
+  struct name : public Token {                                          \
+    constexpr name()                                                    \
+        : Token(sym_impl::type_name<name>().data(),                     \
+                sym_impl::unique_id<name>()) {                          \
+      static_assert(                                                    \
+          sym_impl::unique_id<name>() < kMaxTokenColors,                \
+          "There can only be kMaxTokenColors different token-colors."); \
+    }                                                                   \
+  };                                                                    \
+  static inline name name;                                              \
   }
 
 CREATE_CUSTOM_TOKEN(Scheduled)

@@ -70,14 +70,33 @@ class PetriNet final {
       const std::string &transition) const noexcept;
 
   /**
-   * @brief The default transition payload (DirectMutation) is overload by the
+   * @brief The default transition payload (DirectMutation) is overloaded by the
    * Callback supplied for a specific transition.
    *
    * @param transition the name of transition
    * @param callback the callback
    */
   void registerCallback(const std::string &transition,
-                        const Callback &callback) const noexcept;
+                        Callback &&callback) const noexcept;
+
+  /**
+   * @brief Construct a Callback of type T in place. This is required for type
+   * that are not moveable;
+   *
+   * @tparam T type of the Callback
+   * @tparam Args types of the constructor-arguments
+   * @param transition the name of the transitions
+   * @param args arguments for constructor of T
+   */
+  template <typename T, typename... Args>
+  void registerCallbackInPlace(const std::string &transition,
+                               Args &&...args) const noexcept {
+    if (impl == nullptr || s.empty()) {
+      return;
+    }
+    s.emplace(getCallbackItr(transition), identity<T>{},
+              std::forward<Args>(args)...);
+  }
 
   /**
    * @brief Get the Marking object. This function is thread-safe and be called
@@ -105,8 +124,19 @@ class PetriNet final {
   friend Eventlog(symmetri::getLog)(const PetriNet &);
 
  private:
+  /**
+   * @brief Get the Callback Itr object in the store for the Callback with a
+   * specific name
+   *
+   * @param transition_name
+   * @return std::vector<Callback>::iterator
+   */
+  std::vector<Callback>::iterator getCallbackItr(
+      const std::string &transition_name) const;
+
   const std::shared_ptr<Petri> impl;  ///< Pointer to the implementation, all
-                                      ///< information is stored in Petri
+  ///< information is stored in Petri
+  std::vector<Callback> &s;
 };
 
 }  // namespace symmetri

@@ -44,7 +44,7 @@ TEST_CASE("Constructing is just as you expect") {
 TEST_CASE("Creating and and inserting is ok") {
   Callback f(Foo("hi"));
   std::vector<Callback> p;
-  p.push_back(f);
+  p.emplace_back(std::move(f));
   resume(p.back());
 }
 

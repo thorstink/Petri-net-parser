@@ -59,8 +59,8 @@ int main(int, char *argv[]) {
   Marking sub_goal_marking = {{"P2", Success}};
   std::set<std::string> pnmls = {pnml1, pnml2};
   PetriNet subnet(pnmls, "SubNet", pool, sub_goal_marking);
-  subnet.registerCallback("T0", Foo("SubFoo"));
-  subnet.registerCallback("T1", Foo("SubBar"));
+  subnet.registerCallbackInPlace<Foo>("T0", "SubFoo");
+  subnet.registerCallbackInPlace<Foo>("T1", "SubBar");
 
   // We create another PetriNet by flatly composing all three petri nets.
   // Again we have 2 Foo-transitions, and the first transition (T0) is the
@@ -72,8 +72,8 @@ int main(int, char *argv[]) {
                               {"P3", Success}};
   PetriNet bignet({pnml1, pnml2, pnml3}, "RootNet", pool, big_goal_marking);
   bignet.registerCallback("T0", subnet);
-  bignet.registerCallback("T1", Foo("Bar"));
-  bignet.registerCallback("T2", Foo("Foo"));
+  bignet.registerCallbackInPlace<Foo>("T1", "Bar");
+  bignet.registerCallbackInPlace<Foo>("T2", "Foo");
   // a flag to check if we are running
   std::atomic<bool> running(true);
 

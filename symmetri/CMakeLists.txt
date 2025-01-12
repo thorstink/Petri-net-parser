@@ -1,6 +1,6 @@
 include_directories(include submodules)
 
-#lib
+# lib
 add_library(${PROJECT_NAME} SHARED
   types.cpp
   tasks.cpp
@@ -12,6 +12,7 @@ add_library(${PROJECT_NAME} SHARED
   grml_parser.cpp
   submodules/tinyxml2/tinyxml2.cpp
 )
+
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 target_link_libraries(${PROJECT_NAME} PUBLIC pthread)
 
@@ -52,8 +53,8 @@ write_basic_package_version_file(
 
 install(
   FILES
-    "${PROJECT_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake"
-    "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+  "${PROJECT_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake"
+  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
   DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}
 )
 
@@ -74,4 +75,19 @@ install(
 
 if(BUILD_TESTING)
   add_subdirectory(tests)
+endif()
+
+if(BUILD_GUI)
+  add_library(static_${PROJECT_NAME} STATIC
+    types.cpp
+    tasks.cpp
+    symmetri.cpp
+    petri.cpp
+    petri_traits.cpp
+    petri_utilities.cpp
+    pnml_parser.cpp
+    grml_parser.cpp
+    submodules/tinyxml2/tinyxml2.cpp
+  )
+  add_subdirectory(gui)
 endif()

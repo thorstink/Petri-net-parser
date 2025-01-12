@@ -3,20 +3,53 @@ name: Build project
 on: [push]
 
 jobs:
-  build-project:
-    runs-on: ubuntu-latest
+  build-mac:
+    runs-on: macos-14
     steps:
     - uses: actions/checkout@v1
-    - name: "build project"
+    - name: "build mac"
       run: |
+        brew install glfw svg2png
         git submodule update --init --recursive
         mkdir build
         cd build
-        bash -c 'cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=ON ..'
+        bash -c 'cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=ON -DBUILD_GUI=ON ..'
         make
+    - name: Upload macos
+      uses: actions/upload-artifact@v4
+      with:
+        name: Farbart macos
+        path: build/Farbart.tar.gz
 
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: "build linux"
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y libglfw3-dev libsdl2-dev gcc-multilib g++-multilib libfreetype6-dev libvulkan-dev
+        git submodule update --init --recursive
+        mkdir build
+        cd build
+        bash -c 'cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=ON -DBUILD_GUI=ON ..'
+        make
+    - name: Upload linux
+      uses: actions/upload-artifact@v4
+      with:
+        name: Farbart linux x64-86
+        path: build/symmetri/gui/Farbart
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
     - name: "tests with ASAN"
       run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y libglfw3-dev libsdl2-dev gcc-multilib g++-multilib libfreetype6-dev libvulkan-dev
+        git submodule update --init --recursive
+        mkdir build
         cd build
         bash -c 'cmake  -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DASAN_BUILD=ON -DTSAN_BUILD=OFF ..'
         make
@@ -25,6 +58,7 @@ jobs:
     - name: "tests with TSAN"
       run: |
         cd build
+        make clean
         bash -c 'cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DASAN_BUILD=OFF -DTSAN_BUILD=ON ..'
         make
         ctest -VV

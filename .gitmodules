@@ -1,3 +1,6 @@
 [submodule "submodules/tinyxml2"]
 	path = symmetri/submodules/tinyxml2
 	url = https://github.com/leethomason/tinyxml2.git
+[submodule "symmetri/gui/imgui"]
+	path = symmetri/gui/imgui
+	url = https://github.com/ocornut/imgui.git

@@ -319,7 +319,6 @@ concept Complete = requires { sizeof(T); };
 
 // Note: this mirrors the named requirements, not the standard concepts, so we
 // don't require the destructor to be noexcept for Destructible.
-
 template <typename T>
 concept Destructible = std::is_destructible<T>::value;
 
@@ -356,9 +355,9 @@ concept NoThrowConvertibleTo =
 
 // Note: std::default_initializable requires std::destructible.
 template <typename T>
-concept DefaultConstructible =
-    ConstructibleFrom<T> && requires { T{}; } &&
-    requires { ::new (static_cast<void*>(nullptr)) T; };
+concept DefaultConstructible = ConstructibleFrom<T> && requires {
+  T{};
+} && requires { ::new (static_cast<void*>(nullptr)) T; };
 
 template <typename T>
 concept MoveAssignable = std::assignable_from<T&, T>;
@@ -404,59 +403,50 @@ concept EqualityComparable = std::equality_comparable<T>;
 //   no condition; we use std::allocator<T> regardless of A
 //
 // see [22.2.1].16
-template <typename T, typename X, typename A, typename... Args>
-concept EmplaceConstructible =
-    std::same_as<typename X::value_type, T> &&
-    ((requires {
-        typename X::allocator_type;
-      }  // only perform this check if X is
-      && std::same_as<
-             typename X::allocator_type,  // allocator-aware
-             typename std::allocator_traits<A>::template rebind_alloc<T>> &&
-      (
-          requires(A m, T* p, Args&&... args) {
-            m.construct(p, std::forward<Args>(args)...);
-          } ||
-          requires(T * p, Args&&... args) {
+template <typename T, typename X, typename A, typename ...Args>
+    concept EmplaceConstructible =
+          std::same_as<typename X::value_type, T>
+      &&  (  (  requires { typename X::allocator_type; } // only perform this check if X is
+            &&  std::same_as<typename X::allocator_type, // allocator-aware
+                             typename std::allocator_traits<A>::template rebind_alloc<T>>
+            &&  (  requires (A m, T *p, Args&&... args)
+                   {
+                     m.construct (p, std::forward<Args> (args)...);
+                   }
+               ||  requires (T *p, Args&&... args)
+                   {
 #if __cplusplus >= 202002L  // c++20 fully featured
-            {
-              std::construct_at(p, std::forward<Args>(args)...)
-              } -> std::same_as<T*>;
+                     { std::construct_at (p, std::forward<Args> (args)...) } -> std::same_as<T *>;
 #else
                      ::new (std::declval<void *> ()) T (std::declval<Args> ()...);
 #endif
-          })) ||
-     (
-         !requires { typename X::allocator_type; } &&
-         requires(T * p, Args&&... args) {
+                   }))
+         ||  (! requires { typename X::allocator_type; }
+            &&  requires (T *p, Args&&... args)
+                {
 #if __cplusplus >= 202002L  // c++20 fully featured
-           {
-             std::construct_at(p, std::forward<Args>(args)...)
-             } -> std::same_as<T*>;
+                  { std::construct_at (p, std::forward<Args> (args)...) } -> std::same_as<T *>;
 #else
                   ::new (std::declval<void *> ()) T (std::declval<Args> ()...);
 #endif
-         }));
+                }));
 
 template <typename T, typename X,
           typename A = typename std::conditional<requires {
-                                                   typename X::allocator_type;
-                                                 }, typename X::allocator_type,
-                                                 std::allocator<T>>::type>
+            typename X::allocator_type;
+          }, typename X::allocator_type, std::allocator<T>>::type>
 concept DefaultInsertable = EmplaceConstructible<T, X, A>;
 
 template <typename T, typename X,
           typename A = typename std::conditional<requires {
-                                                   typename X::allocator_type;
-                                                 }, typename X::allocator_type,
-                                                 std::allocator<T>>::type>
+            typename X::allocator_type;
+          }, typename X::allocator_type, std::allocator<T>>::type>
 concept MoveInsertable = EmplaceConstructible<T, X, A, T>;
 
 template <typename T, typename X,
           typename A = typename std::conditional<requires {
-                                                   typename X::allocator_type;
-                                                 }, typename X::allocator_type,
-                                                 std::allocator<T>>::type>
+            typename X::allocator_type;
+          }, typename X::allocator_type, std::allocator<T>>::type>
 concept CopyInsertable =
     MoveInsertable<T, X, A> && EmplaceConstructible<T, X, A, T&> &&
     EmplaceConstructible<T, X, A, const T&>;
@@ -464,9 +454,8 @@ concept CopyInsertable =
 // same method as with EmplaceConstructible
 template <typename T, typename X,
           typename A = typename std::conditional<requires {
-                                                   typename X::allocator_type;
-                                                 }, typename X::allocator_type,
-                                                 std::allocator<T>>::type>
+            typename X::allocator_type;
+          }, typename X::allocator_type, std::allocator<T>>::type>
 concept Erasable =
     std::same_as<typename X::value_type, T> &&
     ((requires { typename X::allocator_type; }  // if X is allocator aware
@@ -491,7 +480,7 @@ concept NullablePointer =
     CopyAssignable<T> && Destructible<T> &&
     ConstructibleFrom<T, std::nullptr_t> && ConvertibleTo<std::nullptr_t, T> &&
     requires(T p, T q, std::nullptr_t np) {
-      { T(np) } -> std::same_as<T>;
+      T(np);
       { p = np } -> std::same_as<T&>;
       { p != q } -> ContextuallyConvertibleToBool;
       { p == np } -> ContextuallyConvertibleToBool;
@@ -579,13 +568,14 @@ concept AllocatorFor =
           typename std::allocator_traits<A>::difference_type>;
 
       // A::template rebind<U>::other [optional]
-      requires !requires { typename A::template rebind<U>::other; } ||
-                   requires {
-                     std::same_as<decltype(b),
-                                  typename A::template rebind<U>::other>;
-                     std::same_as<
-                         A, typename decltype(b)::template rebind<T>::other>;
-                   };
+      requires !requires {
+        typename A::template rebind<U>::other;
+      } || requires {
+        requires std::same_as<decltype(b),
+                              typename A::template rebind<U>::other>;
+        requires std::same_as<A,
+                              typename decltype(b)::template rebind<T>::other>;
+      };
 
       /** Operations on pointers **/
       { *p } -> std::same_as<typename A::value_type&>;
@@ -594,18 +584,15 @@ concept AllocatorFor =
       // Language in the standard implies that `decltype (p)` must either
       // be a raw pointer or implement `operator->`. There is no mention
       // of `std::to_address` or `std::pointer_traits<Ptr>::to_address`.
-      requires std::same_as<decltype(p), typename A::value_type*> ||
-                   requires {
-                     {
-                       p.operator->()
-                       } -> std::same_as<typename A::value_type*>;
-                   };
+      requires std::same_as<decltype(p), typename A::value_type*> || requires {
+        { p.operator->() } -> std::same_as<typename A::value_type*>;
+      };
 
       requires std::same_as<decltype(cp), const typename A::value_type*> ||
                    requires {
                      {
                        cp.operator->()
-                       } -> std::same_as<const typename A::value_type*>;
+                     } -> std::same_as<const typename A::value_type*>;
                    };
 
       { static_cast<decltype(p)>(vp) } -> std::same_as<decltype(p)>;
@@ -613,42 +600,34 @@ concept AllocatorFor =
 
       {
         std::pointer_traits<decltype(p)>::pointer_to(r)
-        } -> std::same_as<decltype(p)>;
+      } -> std::same_as<decltype(p)>;
 
       /** Storage and lifetime operations **/
       // a.allocate (n)
       { a.allocate(n) } -> std::same_as<decltype(p)>;
 
       // a.allocate (n, cvp) [optional]
-      requires !requires { a.allocate(n, cvp); } ||
-                   requires {
-                     { a.allocate(n, cvp) } -> std::same_as<decltype(p)>;
-                   };
+      requires !requires { a.allocate(n, cvp); } || requires {
+        { a.allocate(n, cvp) } -> std::same_as<decltype(p)>;
+      };
 
       // a.deallocate (p, n)
       { a.deallocate(p, n) } -> std::convertible_to<void>;
 
       // a.max_size () [optional]
       requires !requires { a.max_size(); } || requires {
-                                                {
-                                                  a.max_size()
-                                                  }
-                                                  -> std::same_as<decltype(n)>;
-                                              };
+        { a.max_size() } -> std::same_as<decltype(n)>;
+      };
 
       // a.construct (xp, args) [optional]
-      requires !requires { a.construct(xp); } ||
-                   requires {
-                     { a.construct(xp) } -> std::convertible_to<void>;
-                   };
+      requires !requires { a.construct(xp); } || requires {
+        { a.construct(xp) } -> std::convertible_to<void>;
+      };
 
       // a.destroy (xp) [optional]
       requires !requires { a.destroy(xp); } || requires {
-                                                 {
-                                                   a.destroy(xp)
-                                                   }
-                                                   -> std::convertible_to<void>;
-                                               };
+        { a.destroy(xp) } -> std::convertible_to<void>;
+      };
 
       /** Relationship between instances **/
       requires NoThrowConstructibleFrom<A, decltype(b)>;
@@ -662,7 +641,7 @@ concept AllocatorFor =
                    requires {
                      {
                        a.select_on_container_copy_construction()
-                       } -> std::same_as<A>;
+                     } -> std::same_as<A>;
                    };
 
       requires BoolConstant<typename std::allocator_traits<
@@ -673,10 +652,13 @@ concept AllocatorFor =
 
       requires BoolConstant<
           typename std::allocator_traits<A>::propagate_on_container_swap>;
+
+      { a == b } -> std::same_as<bool>;
+      { a != b } -> std::same_as<bool>;
     } &&
     requires(A a1, A a2) {
-      { a1 == a2 } noexcept -> std::same_as<bool>;
-      { a1 != a2 } noexcept -> std::same_as<bool>;
+      { a1 == a2 } -> std::same_as<bool>;
+      { a1 != a2 } -> std::same_as<bool>;
     };
 
 static_assert(
@@ -693,53 +675,49 @@ namespace small_vector {
 // preventing us from short-circuiting for incomplete types.
 
 template <typename T>
-concept Destructible = !
-concepts::Complete<T> || concepts::Destructible<T>;
+concept Destructible = !concepts::Complete<T> || concepts::Destructible<T>;
 
 template <typename T>
-concept MoveAssignable = !
-concepts::Complete<T> || concepts::MoveAssignable<T>;
+concept MoveAssignable = !concepts::Complete<T> || concepts::MoveAssignable<T>;
 
 template <typename T>
-concept CopyAssignable = !
-concepts::Complete<T> || concepts::CopyAssignable<T>;
+concept CopyAssignable = !concepts::Complete<T> || concepts::CopyAssignable<T>;
 
 template <typename T>
-concept MoveConstructible = !
-concepts::Complete<T> || concepts::MoveConstructible<T>;
+concept MoveConstructible =
+    !concepts::Complete<T> || concepts::MoveConstructible<T>;
 
 template <typename T>
-concept CopyConstructible = !
-concepts::Complete<T> || concepts::CopyConstructible<T>;
+concept CopyConstructible =
+    !concepts::Complete<T> || concepts::CopyConstructible<T>;
 
 template <typename T>
-concept Swappable = !
-concepts::Complete<T> || concepts::Swappable<T>;
+concept Swappable = !concepts::Complete<T> || concepts::Swappable<T>;
 
 template <typename T, typename SmallVector, typename Alloc>
-concept DefaultInsertable = !
-concepts::Complete<T> || concepts::DefaultInsertable<T, SmallVector, Alloc>;
+concept DefaultInsertable = !concepts::Complete<T> ||
+                            concepts::DefaultInsertable<T, SmallVector, Alloc>;
 
 template <typename T, typename SmallVector, typename Alloc>
-concept MoveInsertable = !
-concepts::Complete<T> || concepts::MoveInsertable<T, SmallVector, Alloc>;
+concept MoveInsertable =
+    !concepts::Complete<T> || concepts::MoveInsertable<T, SmallVector, Alloc>;
 
 template <typename T, typename SmallVector, typename Alloc>
-concept CopyInsertable = !
-concepts::Complete<T> || concepts::CopyInsertable<T, SmallVector, Alloc>;
+concept CopyInsertable =
+    !concepts::Complete<T> || concepts::CopyInsertable<T, SmallVector, Alloc>;
 
 template <typename T, typename SmallVector, typename Alloc>
-concept Erasable = !
-concepts::Complete<T> || concepts::Erasable<T, SmallVector, Alloc>;
+concept Erasable =
+    !concepts::Complete<T> || concepts::Erasable<T, SmallVector, Alloc>;
 
 template <typename T, typename SmallVector, typename Alloc, typename... Args>
-concept EmplaceConstructible = !
-concepts::Complete<T> ||
+concept EmplaceConstructible =
+    !concepts::Complete<T> ||
     concepts::EmplaceConstructible<T, SmallVector, Alloc, Args...>;
 
 template <typename Alloc, typename T>
-concept AllocatorFor = !
-concepts::Complete<T> || concepts::AllocatorFor<Alloc, T>;
+concept AllocatorFor =
+    !concepts::Complete<T> || concepts::AllocatorFor<Alloc, T>;
 
 template <typename Alloc>
 concept Allocator = AllocatorFor<Alloc, typename Alloc::value_type>;
@@ -971,8 +949,8 @@ constexpr bool operator==(
     const small_vector_iterator<PointerRHS, DifferenceTypeRHS>&
         rhs) noexcept(noexcept(lhs.base() == rhs.base()))
   requires requires {
-             { lhs.base() == rhs.base() } -> std::convertible_to<bool>;
-           }
+    { lhs.base() == rhs.base() } -> std::convertible_to<bool>;
+  }
 {
   return lhs.base() == rhs.base();
 }
@@ -983,8 +961,8 @@ constexpr bool operator==(
     const small_vector_iterator<Pointer, DifferenceType>&
         rhs) noexcept(noexcept(lhs.base() == rhs.base()))
   requires requires {
-             { lhs.base() == rhs.base() } -> std::convertible_to<bool>;
-           }
+    { lhs.base() == rhs.base() } -> std::convertible_to<bool>;
+  }
 {
   return lhs.base() == rhs.base();
 }
@@ -1013,9 +991,8 @@ template <typename PointerLHS, typename DifferenceTypeLHS, typename PointerRHS,
 constexpr auto operator<=>(
     const small_vector_iterator<PointerLHS, DifferenceTypeLHS>& lhs,
     const small_vector_iterator<PointerRHS, DifferenceTypeRHS>&
-        rhs) noexcept(noexcept(lhs.base() <
-                               rhs.base()) && noexcept(rhs.base() <
-                                                       lhs.base())) {
+        rhs) noexcept(noexcept(lhs.base() < rhs.base()) &&
+                      noexcept(rhs.base() < lhs.base())) {
   using ordering = std::weak_ordering;
   return (lhs.base() < rhs.base())   ? ordering::less
          : (rhs.base() < lhs.base()) ? ordering::greater
@@ -1026,9 +1003,8 @@ template <typename Pointer, typename DifferenceType>
 constexpr auto operator<=>(
     const small_vector_iterator<Pointer, DifferenceType>& lhs,
     const small_vector_iterator<Pointer, DifferenceType>&
-        rhs) noexcept(noexcept(lhs.base() <
-                               rhs.base()) && noexcept(rhs.base() <
-                                                       lhs.base())) {
+        rhs) noexcept(noexcept(lhs.base() < rhs.base()) &&
+                      noexcept(rhs.base() < lhs.base())) {
   using ordering = std::weak_ordering;
   return (lhs.base() < rhs.base())   ? ordering::less
          : (rhs.base() < lhs.base()) ? ordering::greater
@@ -1282,7 +1258,7 @@ class GCH_EMPTY_BASE allocator_inliner<Allocator, true> : private Allocator {
             typename std::enable_if<!IsNoOp, bool>::type = false>
   GCH_CPP20_CONSTEXPR void
   maybe_assign(const allocator_inliner& other) noexcept(
-      noexcept(Allocator::operator=(other))) {
+      noexcept(std::declval<Allocator&>().operator=(other))) {
     Allocator::operator=(other);
   }
 
@@ -1293,7 +1269,7 @@ class GCH_EMPTY_BASE allocator_inliner<Allocator, true> : private Allocator {
   template <bool IsNoOp = move_assign_is_noop,
             typename std::enable_if<!IsNoOp, bool>::type = false>
   GCH_CPP20_CONSTEXPR void maybe_assign(allocator_inliner&& other) noexcept(
-      noexcept(Allocator::operator=(std::move(other)))) {
+      noexcept(std::declval<Allocator&>().operator=(std::move(other)))) {
     Allocator::operator=(std::move(other));
   }
 
@@ -2794,9 +2770,8 @@ class small_vector_base : public allocator_interface<Allocator> {
       typename std::enable_if<(LessEqualI <= InlineCapacity)>::type* = nullptr>
   GCH_CPP20_CONSTEXPR small_vector_base& move_assign_default(
       small_vector_base<Allocator, LessEqualI>&&
-          other) noexcept(std::is_nothrow_move_assignable<value_ty>::value&&
-                              std::is_nothrow_move_constructible<
-                                  value_ty>::value) {
+          other) noexcept(std::is_nothrow_move_assignable<value_ty>::value &&
+                          std::is_nothrow_move_constructible<value_ty>::value) {
     // We only move the allocation pointer over if it has strictly greater
     // capacity than the inline capacity of `*this` because allocations can
     // never have a smaller capacity than the inline capacity.
@@ -3993,9 +3968,9 @@ class small_vector_base : public allocator_interface<Allocator> {
   void swap_elements(small_vector_base& other) noexcept(
       std::is_nothrow_move_constructible<value_ty>::value
 #ifdef GCH_LIB_IS_SWAPPABLE
-          && std::is_nothrow_swappable<value_ty>::value
+      && std::is_nothrow_swappable<value_ty>::value
 #else
-          && detail::small_vector_adl::is_nothrow_swappable<value_ty>::value
+      && detail::small_vector_adl::is_nothrow_swappable<value_ty>::value
 #endif
   ) {
     assert(get_size() <= other.get_size());
@@ -4012,9 +3987,9 @@ class small_vector_base : public allocator_interface<Allocator> {
   void swap_default(small_vector_base& other) noexcept(
       std::is_nothrow_move_constructible<value_ty>::value
 #ifdef GCH_LIB_IS_SWAPPABLE
-          && std::is_nothrow_swappable<value_ty>::value
+      && std::is_nothrow_swappable<value_ty>::value
 #else
-          && detail::small_vector_adl::is_nothrow_swappable<value_ty>::value
+      && detail::small_vector_adl::is_nothrow_swappable<value_ty>::value
 #endif
   ) {
     // This function is used when:
@@ -4109,9 +4084,9 @@ class small_vector_base : public allocator_interface<Allocator> {
   GCH_CPP20_CONSTEXPR void swap(small_vector_base& other) noexcept(
       std::is_nothrow_move_constructible<value_ty>::value
 #ifdef GCH_LIB_IS_SWAPPABLE
-          && std::is_nothrow_swappable<value_ty>::value
+      && std::is_nothrow_swappable<value_ty>::value
 #else
-          && detail::small_vector_adl::is_nothrow_swappable<value_ty>::value
+      && detail::small_vector_adl::is_nothrow_swappable<value_ty>::value
 #endif
   ) {
     if (get_capacity() < other.get_capacity())
@@ -4414,43 +4389,43 @@ class small_vector
 #ifdef GCH_LIB_CONCEPTS
 
  private:
-  static constexpr auto Destructible =
+  static constexpr bool Destructible =
       concepts::small_vector::Destructible<value_type>;
 
-  static constexpr auto MoveAssignable =
+  static constexpr bool MoveAssignable =
       concepts::small_vector::MoveAssignable<value_type>;
 
-  static constexpr auto CopyAssignable =
+  static constexpr bool CopyAssignable =
       concepts::small_vector::CopyAssignable<value_type>;
 
-  static constexpr auto MoveConstructible =
+  static constexpr bool MoveConstructible =
       concepts::small_vector::MoveConstructible<value_type>;
 
-  static constexpr auto CopyConstructible =
+  static constexpr bool CopyConstructible =
       concepts::small_vector::CopyConstructible<value_type>;
 
-  static constexpr auto Swappable =
+  static constexpr bool Swappable =
       concepts::small_vector::Swappable<value_type>;
 
-  static constexpr auto DefaultInsertable =
+  static constexpr bool DefaultInsertable =
       concepts::small_vector::DefaultInsertable<value_type, small_vector,
                                                 allocator_type>;
 
-  static constexpr auto MoveInsertable =
+  static constexpr bool MoveInsertable =
       concepts::small_vector::MoveInsertable<value_type, small_vector,
                                              allocator_type>;
 
-  static constexpr auto CopyInsertable =
+  static constexpr bool CopyInsertable =
       concepts::small_vector::CopyInsertable<value_type, small_vector,
                                              allocator_type>;
 
-  static constexpr auto Erasable =
+  static constexpr bool Erasable =
       concepts::small_vector::Erasable<value_type, small_vector,
                                        allocator_type>;
 
   template <typename... Args>
   struct EmplaceConstructible {
-    static constexpr auto value =
+    static constexpr bool value =
         concepts::small_vector::EmplaceConstructible<value_type, small_vector,
                                                      allocator_type, Args...>;
   };
@@ -4579,7 +4554,8 @@ class small_vector
   GCH_CPP20_CONSTEXPR explicit small_vector(
       small_vector<T, I, Allocator>&&
           other) noexcept(std::is_nothrow_move_constructible<value_type>::
-                              value&& I < InlineCapacity)
+                              value &&
+                          I < InlineCapacity)
       : base(base::bypass, std::move(other)) {
   }
 

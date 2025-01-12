@@ -65,7 +65,7 @@ Token fire(const T &callback) {
   if constexpr (std::is_same_v<Token, decltype(callback())>) {
     return callback();
   } else if constexpr (std::is_convertible_v<decltype(callback()), Token>) {
-    return callback();
+    return Token(callback());
   } else if constexpr (std::is_same_v<void, decltype(callback())>) {
     callback();
     return Success;
@@ -82,6 +82,11 @@ template <typename T>
 Eventlog getLog(const T &) {
   return {};
 }
+
+template <typename T>
+struct identity {
+  typedef T type;
+};
 
 /**
  * @brief Callback is a wrapper around any type that you to tie to a
@@ -105,6 +110,15 @@ class Callback {
    */
   Callback(Transition callback)
       : self_(std::make_shared<model<Transition>>(std::move(callback))) {}
+
+  template <typename T, typename... Args>
+  Callback(identity<T>, Args &&...args)
+      : self_(std::make_shared<model<T>>(std::forward<Args>(args)...)) {}
+
+  Callback(Callback &&f) = default;
+  Callback &operator=(Callback &&other) = default;
+  Callback(const Callback &o) = delete;
+  Callback &operator=(const Callback &other) = delete;
 
   friend Token fire(const Callback &callback) {
     return callback.self_->fire_();
@@ -145,7 +159,10 @@ class Callback {
    */
   template <typename Transition>
   struct model final : concept_t {
-    model(Transition &&x) : transition_(std::move(x)) {}
+    explicit model(Transition &&t) : transition_(std::move(t)) {}
+    template <typename... Args>
+    model(Args &&...args) : transition_(std::forward<Args>(args)...) {}
+
     Token fire_() const override { return fire(transition_); }
     Eventlog get_log_() const override { return getLog(transition_); }
     void cancel_() const override { return cancel(transition_); }
